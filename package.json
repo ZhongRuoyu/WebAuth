@@ -1,0 +1,5 @@
+{
+    "name": "webauth",
+    "description": "An HTTPS-based authentication API.",
+    "main": "auth.js"
+}

@@ -56,29 +56,39 @@ async function handleRequest(request) {
             return new Response("success", { status: 200 });
         }
         case "auth_user": {
-            const username = params.get("username");
-            const password = params.get("password");
-            const sessionTtl = +params.get("ttl");
-            if (username === null || username === "" ||
-                password === null || password === "") {
-                return new Response("bad request", { status: 400 });
-            }
-            const user = await AUTH.get(username);
-            if (user === null) {
-                return new Response("user does not exist", { status: 406 });
-            }
-            const { salt, hash } = JSON.parse(user);
-            const saltedPassword = password + salt;
-            const hashResult = await digestMessage(saltedPassword);
-            if (hashResult === hash) {
-                if (sessionTtl > 0) {
-                    const sessionId = await newSession(username, sessionTtl);
-                    return new Response(sessionId, { status: 200 });
-                } else {
+            const sessionId = params.get("session");
+            if (sessionId !== null) {
+                const sessionUsername = await SESSIONS.get(sessionId);
+                if (sessionUsername !== null) {
                     return new Response("success", { status: 200 });
+                } else {
+                    return new Response("failure", { status: 401 });
                 }
             } else {
-                return new Response("failure", { status: 401 });
+                const username = params.get("username");
+                const password = params.get("password");
+                const sessionTtl = +params.get("ttl");
+                if (username === null || username === "" ||
+                    password === null || password === "") {
+                    return new Response("bad request", { status: 400 });
+                }
+                const user = await AUTH.get(username);
+                if (user === null) {
+                    return new Response("user does not exist", { status: 406 });
+                }
+                const { salt, hash } = JSON.parse(user);
+                const saltedPassword = password + salt;
+                const hashResult = await digestMessage(saltedPassword);
+                if (hashResult === hash) {
+                    if (sessionTtl > 0) {
+                        const sessionId = await newSession(username, Math.max(sessionTtl, 60));
+                        return new Response(sessionId, { status: 200 });
+                    } else {
+                        return new Response("success", { status: 200 });
+                    }
+                } else {
+                    return new Response("failure", { status: 401 });
+                }
             }
         }
         case "change_password": {

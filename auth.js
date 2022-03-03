@@ -132,7 +132,7 @@ async function handleRequest(request) {
             }
             const user = await AUTH.get(username);
             if (user === null) {
-                return new Response("success", { status: 200 });
+                return new Response("user does not exist", { status: 406 });
             }
             const { salt, hash } = JSON.parse(user);
             const saltedPassword = password + salt;

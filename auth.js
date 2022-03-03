@@ -24,6 +24,19 @@ addEventListener("fetch", event => {
 });
 
 async function handleRequest(request) {
+    const url = new URL(request.url);
+    const { protocol } = url;
+
+    if (protocol !== "https:") {
+        url.protocol = "https:";
+        return new Response(null, {
+            status: 301,
+            headers: {
+                Location: url,
+            },
+        });
+    }
+
     const requestMethod = request.method;
     if (requestMethod !== "POST") {
         return new Response("method not allowed", { status: 405 });

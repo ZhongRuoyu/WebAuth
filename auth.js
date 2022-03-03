@@ -1,21 +1,4 @@
-async function digestMessage(message) {
-    const msgUint8 = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
-    const hashBuffer = await crypto.subtle.digest("SHA-512", msgUint8);           // hash the message
-    const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join(""); // convert bytes to hex string
-    return hashHex;
-}
-
-async function invalidateSessions(username) {
-    const sessions = await SESSIONS.list();
-    for (const session of sessions.keys) {
-        const sessionId = session.name;
-        const sessionUsername = await SESSIONS.get(sessionId);
-        if (sessionUsername === username) {
-            await SESSIONS.delete(sessionId);
-        }
-    }
-}
+"use strict";
 
 
 
@@ -75,6 +58,7 @@ async function handleRequest(request) {
         case "auth_user": {
             const username = params.get("username");
             const password = params.get("password");
+            const sessionTtl = +params.get("ttl");
             if (username === null || username === "" ||
                 password === null || password === "") {
                 return new Response("bad request", { status: 400 });
@@ -87,7 +71,12 @@ async function handleRequest(request) {
             const saltedPassword = password + salt;
             const hashResult = await digestMessage(saltedPassword);
             if (hashResult === hash) {
-                return new Response("success", { status: 200 });
+                if (sessionTtl > 0) {
+                    const sessionId = await newSession(username, sessionTtl);
+                    return new Response(sessionId, { status: 200 });
+                } else {
+                    return new Response("success", { status: 200 });
+                }
             } else {
                 return new Response("failure", { status: 401 });
             }
@@ -149,4 +138,31 @@ async function handleRequest(request) {
     }
 
     return new Response("bad request", { status: 400 });
+}
+
+
+
+async function digestMessage(message) {
+    const msgUint8 = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
+    const hashBuffer = await crypto.subtle.digest("SHA-512", msgUint8);           // hash the message
+    const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join(""); // convert bytes to hex string
+    return hashHex;
+}
+
+async function newSession(username, expirationTtl) {
+    const sessionId = crypto.randomUUID();
+    await SESSIONS.put(sessionId, username, { expirationTtl });
+    return sessionId;
+}
+
+async function invalidateSessions(username) {
+    const sessions = await SESSIONS.list();
+    for (const session of sessions.keys) {
+        const sessionId = session.name;
+        const sessionUsername = await SESSIONS.get(sessionId);
+        if (sessionUsername === username) {
+            await SESSIONS.delete(sessionId);
+        }
+    }
 }
